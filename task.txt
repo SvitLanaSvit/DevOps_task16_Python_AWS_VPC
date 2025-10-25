@@ -1,0 +1,36 @@
+To Do
+AWS VPC Exercise
+Task
+Create a VPC
+
+Create two subnet groups: public and private
+
+Create one EC2 instance in the public subnet and one EC2 instance in the private subnet
+
+Ensure that the EC2 instance in the public subnet is accessible over the internet, allowing you to connect via SSH
+
+Ensure that the EC2 instance in the private subnet is not accessible from the internet but is accessible from the EC2 instance in the public subnet
+
+Ensure that the EC2 instance in the private subnet has access to the internet
+
+
+
+To Read
+What is Amazon VPC?
+VPC with Public and Private Subnets (NAT)
+AWS EC2 Getting Started
+
+
+Формат здачі ДЗ:1. Скрін з створеним VPC
+
+2. Скріни з створеними сабнетами
+
+3. Скріни з створеними ЕС2
+
+4. Скріни з створенням всього необхідного для доступу до Інтернет
+
+5. Скрін з підключенням по SSH до EC2, яка в публічній підмережі
+
+6. Скрін з підключенням по SSH з EC2, яка в публічній підмережі до ЕС2, яка в приватній підмережі
+
+7. Скрін з пінгом google.com з EC2, яка в приватній підмережі
