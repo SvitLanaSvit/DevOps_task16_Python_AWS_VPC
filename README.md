@@ -24,25 +24,31 @@
     - Enable DNS hostnames: ON
     - Enable DNS resolution: ON
 1.4 Create VPC.
-[СКРІН 1: Сторінка створеного VPC з увімкненими DNS]
+
+![Create VPC](Screenshots/1_Create_VPC.png)
 
 Чому так:
 - 10.0.0.0/16 дає простір для підмереж і уникає конфліктів з 192.168.x.x (домашні мережі).
 - DNS потрібен для репозиторіїв/імен.
 
 ======================================================================
-2) Internet Gateway (створити ПЕРШИМ за порадою викладача)
+2) Internet Gateway (створити ПЕРШИМ)
 ======================================================================
 2.1 VPC → Internet Gateways → Create internet gateway.
 2.2 Name: my-igw → Create.
+
+![Create IGW](Screenshots/2_Create_IGW.png)
+
 2.3 Actions → Attach to VPC → обрати my-vpc.
-[СКРІН 2: IGW attached]
+
+![Attach IGW to VPC Step 1](Screenshots/3_Attach_IGW%20_to_VPC.png)
+![Attach IGW to VPC Step 2](Screenshots/3.2_Attach_IGW%20_to_VPC.png)
 
 Навіщо:
 - IGW надає вхід/вихід у публічній підмережі (для bastion).
 
 ======================================================================
-3) Підмережі (Subnets) — одна AZ для простоти
+3) Підмережі (Subnets)
 ======================================================================
 3.1 VPC → Subnets → Create subnet.
     - VPC: my-vpc
@@ -50,14 +56,22 @@
     - AZ: eu-central-1a
     - CIDR: 10.0.1.0/24
     → Create.
+
+![Create Public Subnet](Screenshots/4.1_Create_Public%20_Subnet.png)
+
 3.2 Повторити для приватної:
     - Name: private-subnet-a
     - AZ: eu-central-1a
     - CIDR: 10.0.2.0/24
+
+![Create Private Subnet](Screenshots/4.2_Create_Private%20_Subnet.png)
+![Subnets Overview](Screenshots/4.3_Subnets.png)
+
 3.3 Вмикаємо публічну IP-автовидачу для public-subnet-a:
     Subnets → public-subnet-a → Actions → Edit subnet settings →
     Enable auto-assign public IPv4 address: ON → Save.
-[СКРІН 3: public-subnet-a з увімкненим auto-assign public IPv4]
+
+![Enable Auto-assign Public IPv4](Screenshots/4.4_Public_Subnet_Enable_IPv4.png)
 
 Пояснення:
 - Публічні EC2 мають отримувати public IP автоматично.
@@ -72,7 +86,9 @@
     - Elastic IP: Allocate new EIP → Associate
     - Name: nat-gw-a
     → Create (дочекатися статусу Available).
-[СКРІН 4: NAT GW Available з привʼязаним EIP]
+
+![Create NAT Gateway Step 1](Screenshots/5.1_Create_Nat_Getway.png)
+![Create NAT Gateway Step 2](Screenshots/5.2_Create_Nat_Getway.png)
 
 Чому:
 - Приватна EC2 виходитиме у світ через NAT (односторонній доступ: тільки OUT).
@@ -83,18 +99,36 @@
 5.1 Публічна таблиця (rt-public-a):
     - VPC → Route tables → Create route table:
       Name: rt-public-a, VPC: my-vpc → Create.
+
+![Create Public Route Table](Screenshots/6.1_Create_Route_Table_Public.png)
+
     - Відкрити rt-public-a → Routes → Edit routes → Add route:
       Destination: 0.0.0.0/0 → Target: Internet Gateway (my-igw) → Save.
+
+![Edit Public Routes Step 1](Screenshots/6.1.1_Edit_Routes_Public_Table.png)
+![Edit Public Routes Step 2](Screenshots/6.1.2_Edit_Routes_Public_Table.png)
+
     - Subnet associations → Edit → обрати public-subnet-a → Save.
-[СКРІН 5: rt-public-a з 0.0.0.0/0 → IGW і асоціацією public-subnet-a]
+
+![Public Subnet Associations Step 1](Screenshots/6.1.3_Subnet_Associations.png)
+![Public Subnet Associations Step 2](Screenshots/6.1.4_Edit_Subnet_Associations.png)
 
 5.2 Приватна таблиця (rt-private-a):
     - Create route table:
       Name: rt-private-a, VPC: my-vpc → Create.
+
+![Create Private Route Table](Screenshots/6.2_Create_Route_Table_Private.png)
+
     - Routes → Edit routes → Add route:
       Destination: 0.0.0.0/0 → Target: NAT Gateway (nat-gw-a) → Save.
+
+![Edit Private Routes Step 1](Screenshots/6.2.3_Edit_Routes_Private_Table.png)
+![Edit Private Routes Step 2](Screenshots/6.2.4_Edit_Routes_Private_Table.png)
+
     - Subnet associations → Edit → обрати private-subnet-a → Save.
-[СКРІН 6: rt-private-a з 0.0.0.0/0 → NAT GW і асоціацією private-subnet-a]
+
+![Private Subnet Associations Step 1](Screenshots/6.2.1_Edit_Subnet_Associations.png)
+![Private Subnet Associations Step 2](Screenshots/6.2.2_Edit_Subnet_Associations.png)
 
 Логіка:
 - Паблік ходить в Інтернет через IGW, приватний — через NAT GW.
@@ -102,22 +136,35 @@
 ======================================================================
 6) Security Groups
 ======================================================================
-6.1 sg-bastion (для публічного інстанса):
-    - EC2 → Security groups → Create security group
-      Name: sg-bastion, VPC: my-vpc.
-      Inbound:
-        Type: SSH, Port: 22, Source: <твій зовнішній IP>/32 (наприклад 88.72.141.255/32)
-      Outbound: All traffic (default).
-    → Create.
-[СКРІН 7: sg-bastion Inbound SSH з твого IP]
+6.1 Одна спільна група безпеки (sg-bastion) для обох інстансів
+======================================================================
+- Використовується одна Security Group у межах VPC `my-vpc`, 
+  яку застосовано і до bastion-public, і до app-private.
+- Правила налаштовані так, щоб дозволяти доступ як з Інтернету, так і між інстансами всередині VPC.
 
-6.2 sg-private (для приватного інстанса):
-    - Create security group: Name: sg-private, VPC: my-vpc.
-      Inbound:
-        Type: SSH, Port: 22, Source: Security group → sg-bastion (посилання на SG!)
-      Outbound: All traffic (default).
-    → Create.
-[СКРІН 8: sg-private Inbound SSH from sg-bastion]
+Inbound rules:
+  1. SSH (TCP, порт 22) — Source: <мій зовнішній IP>/32 (наприклад 88.72.141.255/32)
+     → дозволяє підключення з мого локального комп’ютера до bastion-public через Інтернет.
+  2. SSH (TCP, порт 22) — Source: sg-bastion (та сама security group)
+     → дозволяє SSH-з’єднання між інстансами, які належать до цієї ж групи,
+       тобто bastion-public може підключатися до app-private усередині VPC.
+
+Outbound rules:
+  - All traffic (за замовчуванням)
+    → дозволяє вихідний трафік з обох інстансів на будь-які адреси.
+
+![Create Security Group Step 1](Screenshots/8_Create_Security_Group_Bastion.png)
+![Create Security Group Step 2](Screenshots/8.2_Create_Security_Group_Bastion.png)
+![Create Security Group Step 3](Screenshots/8.3_Create_Security_Group_Bastion.png)
+![Create Security Group Step 4](Screenshots/8.4_Create_Security_Group_Bastion.png)
+
+Пояснення:
+- Перше правило забезпечує зовнішній SSH доступ до публічного інстанса.
+- Друге правило (self-reference) дозволяє внутрішню комунікацію між EC2,
+  які мають цю саму групу безпеки — тобто bastion може входити на private.
+- Це правильне і безпечне рішення, яке не ламається при зміні IP-адрес.
+- Для навчального середовища достатньо однієї SG, 
+  у production зазвичай роблять окремі SG для bastion і private.
 
 Best practice:
 - Використовуємо “SG → SG”, а не IP бастіона — не ламається при зміні адрес.
@@ -138,7 +185,12 @@ Best practice:
         Security group: sg-bastion
       Storage: 8 GB (default)
     → Launch.
-[СКРІН 9: bastion-public з Public IPv4]
+
+![Create Bastion Public EC2 Step 1](Screenshots/7.1_Create_EC2_Bastion_Public.png)
+![Create Bastion Public EC2 Step 2](Screenshots/7.2_Create_EC2_Bastion_Public.png)
+![Create Bastion Public EC2 Step 3](Screenshots/7.3_Create_EC2_Bastion_Public.png)
+![Create Bastion Public EC2 Step 4](Screenshots/7.4_Create_EC2_Bastion_Public.png)
+![Create Bastion Public EC2 Step 5](Screenshots/7.5_Create_EC2_Bastion_Public.png)
 
 7.2 app-private:
     - Launch instance
@@ -150,10 +202,11 @@ Best practice:
         VPC: my-vpc
         Subnet: private-subnet-a
         Auto-assign public IP: Disable
-        Security group: sg-private
+        Security group: sg-bastion
       Storage: 8 GB (default)
     → Launch.
-[СКРІН 10: app-private без Public IP, тільки Private IP 10.0.2.x]
+
+![Create App Private EC2](Screenshots/9.1_Create_EC2_App_Private.png)
 
 ======================================================================
 8) Перевірка SSH доступності (Public)
@@ -164,7 +217,8 @@ Best practice:
 
 Очікування:
 - Успішний логін на bastion-public (має public IP і маршрут через IGW).
-[СКРІН 11: SSH на bastion-public]
+
+![SSH to Public Bastion Result](Screenshots/9_Result_ssh_to_ec2_public.png)
 
 ======================================================================
 9) ProxyJump (SSH у приватний через бастіон)
@@ -172,24 +226,10 @@ Best practice:
 Варіант А — одноразова команда з локального ПК:
     ssh -i ~/.ssh/svitlana-kizilpinar.pem -A -J ubuntu@<BASTION_PUBLIC_IP> ubuntu@<PRIVATE_IP>
 
-Варіант Б — ~/.ssh/config (зручно):
-    Host bastion
-        HostName <BASTION_PUBLIC_IP>
-        User ubuntu
-        IdentityFile ~/.ssh/svitlana-kizilpinar.pem
-
-    Host private
-        HostName <PRIVATE_IP>
-        User ubuntu
-        IdentityFile ~/.ssh/svitlana-kizilpinar.pem
-        ProxyJump bastion
-
-Потім:
-    ssh private
-
 Очікування:
 - Логін одразу на app-private через стрибок.
-[СКРІН 12: Успішний SSH на 10.0.2.x через -J]
+![SSH to Private App via Bastion Step 1](Screenshots/11_Result_ssh_to_ec2_app_private_from_public_bastion.png)
+![SSH to Private App via Bastion Step 2](Screenshots/12_Result_ssh_to_ec2_app_private_from_public_bastion.png)
 
 ======================================================================
 10) Перевірка: приватний НЕ доступний з Інтернету напряму
@@ -199,17 +239,18 @@ Best practice:
 Очікування:
 - Timeout/No route — це правильно (немає public IP і немає маршруту ззовні).
 
+![SSH to Private App - Failed Direct Access](Screenshots/10_Result_ssh_to_ec2_app_private.png)
+
 ======================================================================
 11) Перевірка: приватний МАЄ доступ в Інтернет (через NAT)
 ======================================================================
 11.1 Вже перебуваючи на app-private, виконати:
-    curl https://ifconfig.me
-    sudo apt update
     ping -c 3 google.com
 
 Очікування:
-- curl повертає зовнішню адресу (EIP NAT GW), apt update працює, ping/NS запис розвʼязується.
-[СКРІН 13: ping/curl/apt з приватного інстанса]
+- ping/NS запис розвʼязується.
+
+![Ping from Private Instance](Screenshots/13_Result_pinf_from_app_private.png)
 
 ======================================================================
 12) Підсумок відповідності вимогам
@@ -221,24 +262,11 @@ Best practice:
 - EC2: bastion-public з public IP (SSH з Інтернету OK).
 - EC2: app-private без public IP (SSH лише через bastion/proxyjump).
 - Інтернет на приватному через NAT: OK (curl/apt/ping).
-[СКРІН 14: Табличка/чек-лист або короткий звіт у довільній формі]
+
+**Завдання виконано успішно!** Всі скріншоти та результати тестування демонструють правильно налаштовану AWS VPC інфраструктуру.
 
 ======================================================================
-13) (Опційно) Діагностика, якщо щось зламається
-======================================================================
-- На bastion:
-    nc -vz 10.0.2.x 22          # перевірка порта 22 на приватному
-- Перевір SG:
-    sg-bastion: Inbound SSH з твоєї зовнішньої IP.
-    sg-private: Inbound SSH з джерела = sg-bastion (SG reference).
-- Перевір RT:
-    rt-public-a: 0.0.0.0/0 → IGW, асоційовано з public-subnet-a.
-    rt-private-a: 0.0.0.0/0 → NAT GW, асоційовано з private-subnet-a.
-- NAT GW: статус Available, розміщений у public-subnet-a, має EIP.
-- NACL: дефолтні (не перетиснуті), Outbound дозволений.
-
-======================================================================
-14) (Опційно) Прибирання (щоб не платити за NAT GW)
+13) (Опційно) Прибирання (щоб не платити за NAT GW)
 ======================================================================
 - Зупинити/Terminate EC2.
 - Видалити NAT Gateway (потім його EIP).
@@ -246,11 +274,3 @@ Best practice:
 - Видалити route tables (якщо створювались окремо).
 - Видалити subnets.
 - Видалити VPC.
-[СКРІН 15: Порожній список ресурсів або позначка, що все видалено]
-
-
-
-
-
-
-
